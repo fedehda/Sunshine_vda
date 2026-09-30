@@ -988,6 +988,10 @@ namespace nvhttp {
     }
     tree.put("root.ServerCodecModeSupport", codec_mode_flags);
 
+    if (!config::nvhttp.external_ip.empty()) {
+      tree.put("root.ExternalIP", config::nvhttp.external_ip);
+    }
+
     tree.put("root.PairStatus", pair_status);
 
     if constexpr (std::is_same_v<SunshineHTTPS, T>) {
@@ -1730,7 +1734,7 @@ namespace nvhttp {
     https_server.resource["^/actions/clipboard$"]["POST"] = setClipboard;
 
     https_server.config.reuse_address = true;
-    https_server.config.address = net::af_to_any_address_string(address_family);
+    https_server.config.address = net::get_bind_address(address_family);
     https_server.config.port = port_https;
 
     http_server.default_resource["GET"] = not_found<SimpleWeb::HTTP>;
@@ -1738,7 +1742,7 @@ namespace nvhttp {
     http_server.resource["^/pair$"]["GET"] = pair<SimpleWeb::HTTP>;
 
     http_server.config.reuse_address = true;
-    http_server.config.address = net::af_to_any_address_string(address_family);
+    http_server.config.address = net::get_bind_address(address_family);
     http_server.config.port = port_http;
 
     auto accept_and_run = [&](auto *http_server) {

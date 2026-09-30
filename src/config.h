@@ -164,6 +164,11 @@ namespace config {
   constexpr int ENCRYPTION_MODE_OPPORTUNISTIC = 1;  // Use video encryption if available, but stream without it if not supported
   constexpr int ENCRYPTION_MODE_MANDATORY = 2;  // Always use video encryption and refuse clients that can't encrypt
 
+  constexpr int PACKETSIZE_MIN = 200;  ///< Lowest accepted configured packet size in bytes.
+  constexpr int PACKETSIZE_MAX = 65535;  ///< Highest accepted configured packet size in bytes.
+  constexpr int PACKETSIZE_SMALL = 500;  ///< Conservative packet size used for low-MTU links.
+  constexpr int PACKETSIZE_LARGE = 1456;  ///< Default large packet size that avoids common MTU fragmentation.
+
   struct stream_t {
     std::chrono::milliseconds ping_timeout;
 
@@ -174,6 +179,9 @@ namespace config {
     // Video encryption settings for LAN and WAN streams
     int lan_encryption_mode;
     int wan_encryption_mode;
+
+    // Limit the packetsize to avoid fragmentation on a low MTU link
+    int packetsize;
   };
 
   struct nvhttp_t {
@@ -280,6 +288,7 @@ namespace config {
 
     std::uint16_t port;
     std::string address_family;
+    std::string bind_address;
 
     std::string log_file;
     bool notify_pre_releases;

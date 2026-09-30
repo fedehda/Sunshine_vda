@@ -1557,13 +1557,15 @@ namespace confighttp {
     server.resource["^/images/logo-apollo-45.png$"]["GET"] = getApolloLogoImage;
     server.resource["^/assets\\/.+$"]["GET"] = getNodeModules;
     server.config.reuse_address = true;
-    server.config.address = net::af_to_any_address_string(address_family);
+    server.config.address = net::get_bind_address(address_family);
     server.config.port = port_https;
+
+    const auto display_addr = net::get_bind_address_url_host();
 
     auto accept_and_run = [&](auto *server) {
       try {
-        server->start([port_https](unsigned short port) {
-          BOOST_LOG(info) << "Configuration UI available at [https://localhost:"sv << port << "]";
+        server->start([&display_addr](unsigned short port) {
+          BOOST_LOG(info) << "Configuration UI available at [https://"sv << display_addr << ':' << port << ']';
         });
       } catch (boost::system::system_error &err) {
         // It's possible the exception gets thrown after calling server->stop() from a different thread

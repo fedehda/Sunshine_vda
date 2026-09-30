@@ -998,8 +998,24 @@ namespace rtsp_stream {
       config.audio.flags[audio::config_t::HIGH_QUALITY] =
         util::from_view(args.at("x-nv-audio.surround.AudioQuality"sv));
 
-      config.controlProtocolType = util::from_view(args.at("x-nv-general.useReliableUdp"sv));
       config.packetsize = util::from_view(args.at("x-nv-video[0].packetSize"sv));
+
+      // Limit the packetsize to avoid fragmentation with clients that cannot configure this value
+      if (config::stream.packetsize && config::stream.packetsize < config.packetsize) {
+        if (config::stream.packetsize < config::PACKETSIZE_MIN || config::stream.packetsize > config::PACKETSIZE_MAX) {
+          BOOST_LOG(warning) << "packetsize range: ["sv << config::PACKETSIZE_MIN << "-"sv << config::PACKETSIZE_MAX
+                             << "] invalid value: "sv << config::stream.packetsize;
+        } else {
+          if (config::stream.packetsize < config::PACKETSIZE_SMALL) {
+            BOOST_LOG(info) << "packetsize is small < "sv << config::PACKETSIZE_SMALL << " bytes, reduce bitrate if the stream breaks"sv;
+          } else if (config::stream.packetsize > config::PACKETSIZE_LARGE) {
+            BOOST_LOG(info) << "packetsize is large > "sv << config::PACKETSIZE_LARGE << " bytes, jumbo frames may be used"sv;
+          }
+
+          BOOST_LOG(info) << "packetsize limit: "sv << config.packetsize << " -> "sv << config::stream.packetsize << " bytes"sv;
+          config.packetsize = config::stream.packetsize;
+        }
+      }
       config.minRequiredFecPackets = util::from_view(args.at("x-nv-vqos[0].fec.minRequiredFecPackets"sv));
       config.mlFeatureFlags = util::from_view(args.at("x-ml-general.featureFlags"sv));
       config.audioQosType = util::from_view(args.at("x-nv-aqos.qosTrafficType"sv));

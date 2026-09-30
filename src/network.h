@@ -59,11 +59,33 @@ namespace net {
   af_e af_from_enum_string(const std::string_view &view);
 
   /**
+   * @brief Get the effective address family for listening sockets.
+   * @details An IPv4 bind address narrows dual-stack mode to IPv4 so the socket protocol matches the bind endpoint.
+   * @param af Configured address family.
+   * @return IPv4 for a valid IPv4 bind address in dual-stack mode, or `af` otherwise.
+   */
+  af_e get_effective_address_family(af_e af);
+
+  /**
    * @brief Get the wildcard binding address for a given address family.
    * @param af Address family.
    * @return Normalized address.
    */
   std::string_view af_to_any_address_string(af_e af);
+
+  /**
+   * @brief Get the binding address to use based on config.
+   * @param af Address family.
+   * @return The configured bind address or wildcard if not configured.
+   */
+  std::string get_bind_address(af_e af);
+
+  /**
+   * @brief Get the configured bind address formatted as a URL host.
+   * @details IPv6 addresses are enclosed in brackets. An empty bind address is represented as `localhost`.
+   * @return URL host for links to services bound by Sunshine.
+   */
+  std::string get_bind_address_url_host();
 
   /**
    * @brief Convert an address to a normalized form.

@@ -123,6 +123,20 @@ const effectivePort = computed(() => +config.value?.port ?? defaultMoonlightPort
       <div class="form-text">{{ $t('config.external_ip_desc') }}</div>
     </div>
 
+    <!-- Bind Address -->
+    <div class="mb-3">
+      <label for="bind_address" class="form-label">Bind Address</label>
+      <input type="text" class="form-control" id="bind_address" placeholder="0.0.0.0" v-model="config.bind_address" />
+      <div class="form-text">IP address of the network interface Apollo should bind to (e.g. for Tailscale/VPN). Leave empty for all interfaces.</div>
+    </div>
+
+    <!-- Packet Size (MTU) -->
+    <div class="mb-3">
+      <label for="packetsize" class="form-label">Packet Size (MTU Limit)</label>
+      <input type="number" min="0" max="65535" class="form-control" id="packetsize" placeholder="0" v-model="config.packetsize" />
+      <div class="form-text">Limits video UDP packet size (bytes) to avoid fragmentation on low MTU links (WAN, 4G/5G, VPNs). 0 = Client decides (recommended: 1024-1400 for VPN/WAN).</div>
+    </div>
+
     <!-- LAN Encryption Mode -->
     <div class="mb-3">
       <label for="lan_encryption_mode" class="form-label">{{ $t('config.lan_encryption_mode') }}</label>
