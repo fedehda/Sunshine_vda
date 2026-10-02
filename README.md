@@ -1,209 +1,101 @@
-# Apollo
+# Sunshine VDA
 
-Apollo is a self-hosted desktop stream host for [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android). Offering low latency, native client resolution, cloud gaming server capabilities with support for AMD, Intel, and Nvidia GPUs for hardware encoding. Software encoding is also available. A web UI is provided to allow configuration and client pairing from your favorite web browser. Pair from the local server or any mobile device.
+**Sunshine VDA** is an advanced self-hosted game and desktop stream host for [Moonlight](https://moonlight-stream.org/) clients. It combines the robust streaming engine and network stack of **[LizardByte/Sunshine](https://github.com/LizardByte/Sunshine)** with the native Windows Virtual Display driver (**SudoVDA**) and automated physical display management originally designed in **[ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo)**.
 
-Major features:
+Offering low latency, dynamic client-matched resolutions, HDR support, and hardware-accelerated encoding for AMD, Intel, and Nvidia GPUs, Sunshine VDA allows you to turn your Windows PC into a dedicated cloud gaming and remote desktop server without requiring physical monitors to stay on or needing dummy HDMI/DisplayPort plugs.
 
-- [x] Built-in Virtual Display with HDR support that matches the resolution/framerate config of your client automatically
-- [x] Permission management for clients
-- [x] Clipboard sync
-- [x] Commands for client connection/disconnection (checkout [Auto pause/resume games](https://github.com/ClassicOldSong/Apollo/wiki/Auto-pause-resume-games))
-- [x] Input only mode
+---
 
-## Usage
+## 1. Origins of this Fork
 
-Refer to LizardByte's documentation hosted on [Read the Docs](https://docs.lizardbyte.dev/projects/sunshine) for now.
+Sunshine VDA bridges two pivotal projects in the game streaming ecosystem:
 
-Currently Virtual Display support is Windows only, Linux support is planned and will be implemented in the future.
+* **[LizardByte/Sunshine](https://github.com/LizardByte/Sunshine):** The upstream, open-source GameStream host with multi-platform support, active community development, and robust WAN streaming capabilities.
+* **[ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo):** A specialized fork that introduced **SudoVDA** (an IddCx-based virtual display driver), automated physical monitor management (`ensure_only_display`), and per-client display identity.
 
-## About Permission System
+**Sunshine VDA** builds upon these foundations by integrating the virtual display architecture into a streamlined codebase while resolving critical GPU startup deadlocks, virtual display session recovery bugs, and WAN/cellular network routing edge cases.
 
-Check out the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Permission-System)
+---
 
-> [!NOTE]
-> The **FIRST** client paired with Apollo will be granted with FULL permissions, then other newly paired clients will only be granted with `View Streams` and `List Apps` permission. If you encounter `Permission Denied` error when trying to launch any app, go check the permission for that device and grant `Launch Apps` permission. The same applies to the situation when you find that you can't move mouse or type with keyboard on newly paired clients, grant the corresponding client `Mouse Input` and `Keyboard Input` permissions.
+## 2. Core Features
 
-## About Virtual Display
+* **Native SudoVDA Virtual Display:** Creates a high-performance virtual monitor on demand that automatically adopts the exact resolution and refresh rate requested by your Moonlight client (up to 4K+, 120Hz/144Hz+).
+* **Automated Physical Display Management (`ensure_only_display`):** Automatically puts physical monitors into sleep/standby mode when a stream starts to conserve power and ensure privacy, restoring them immediately upon disconnection.
+* **Persistent Display Identity:** Unlike virtual display tools that assign random IDs on each launch, Sunshine VDA pairs persistent EDIDs with client certificates. Windows natively remembers your scaling (DPI), desktop layout, and preferences per client device.
+* **Client Display Mode Override (`display_mode`):** Force custom aspect ratios and resolutions (e.g. 16:10 such as `1280x800` or `1920x1200` for tablets and handhelds) on the server side, even if your client's UI only presents standard 16:9 dropdown choices.
+* **Universal Hardware Acceleration:** Low-latency hardware encoding using AMD AMF, Nvidia NVENC, and Intel QuickSync/VAAPI.
+* **Integrated Web Management Interface:** Secure browser-based configuration, PIN-based client pairing, and fine-grained permission controls (mouse, keyboard, launch permissions, clipboard synchronization).
+* **Virtual Audio Routing:** Automatic routing of system audio to a dedicated virtual stereo sink during streaming.
 
-> [!WARNING]
-> ***It is highly recommend to remove any other virtual display solutions from your system and Apollo/Sunshine config, to reduce confusions and compatibility issues.***
+---
 
-> [!NOTE]
-> **TL;DR** Just treat your Artemis/Moonlight client like a dedicated PnP monitor with Apollo.
+## 3. Custom Improvements in this Fork
 
-Apollo uses SudoVDA for virtual display. It features auto resolution and framerate matching for your Artemis/Moonlight clients. The virtual display is created upon the stream starts and removed once the app quits. **If you do not see a new virtual display added or removed when the stream starts or stops, there may be a driver misconfiguration, or another persistent virtual display might still be active.**
+This fork introduces key architectural fixes and optimizations:
 
-The virtual display works just like any physically attached monitors with SudoVDA, there's completely no need for a super complicated solution to "fix" resolution configurations for your devices. Unlike all other solutions that reuses one identity or generate a random one each time for any virtual display sessions, **Apollo assigns a fixed identity for each Artemis/Moonlight client, so your display configuration will be automatically remembered and managed by Windows natively.**
+### A. AMD AMF Encoder Startup Deadlock Fix
+* **Problem:** In upstream Apollo and certain Sunshine builds, initializing encoder probes on modern AMD Radeon GPUs (RDNA/RDNA2/RDNA3 architectures) triggered an indefinite hang with 100% CPU usage on a single thread. This was caused by invoking `avcodec_send_frame(..., nullptr)` to drain a codec session that had not received any frames.
+* **Fix:** Eliminated the unnecessary drain call during initial encoder enumeration (`src/video.cpp`), allowing AMD AMF hardware encoding (`hevc_amf`, `h264_amf`) to initialize instantly and reliably.
 
-## Configuration for dual GPU laptops
+### B. Virtual Display Lifecycle & Session Reconnection
+* **Problem:** When a streaming client disconnected, the virtual display was dismantled. If the application session remained paused (`terminate-on-pause = false`), subsequent reconnects executed `resume()` rather than a fresh `launch()`, failing to recreate the virtual display and causing DXGI capture errors (`Failed to locate an output device`).
+* **Fix:** Enforced clean session teardown and automated re-creation hooks, ensuring that every reconnection reliably reinitializes the SudoVDA display adapter with zero capture stalling.
 
-Apollo supports dual GPUs seamlessly.
+### C. WAN, Double-NAT & Cellular (4G/5G) Compatibility
+* **IPv6 Routing Blackhole Prevention:** Cellular networks frequently provision native IPv6. When hosts advertise dual-stack (`both`) across routers with IPv4-only DMZ/Port Forwarding, mobile clients could stall trying to negotiate unreachable IPv6 endpoints. Sunshine VDA provides streamlined IPv4 enforcement (`address_family = ipv4`) to guarantee direct NAT routing.
+* **Firewall NAT Traversal:** Comprehensive configuration guides for Windows Defender Firewall `EdgeTraversalPolicy` to prevent silent dropping of inbound UDP video and audio packets (ports 47998–48010) over WAN.
 
-If you want to use your dGPU, just set the `Adapter Name` to your dGPU and enable `Headless mode` in `Audio/Video` tab, save and restart your computer. No dummy plug is needed any more, the image will be rendered and encoded directly from your dGPU.
+### D. Refined Multi-Device Coexistence
+* Enhanced handling of simultaneous client profiles (e.g. Steam Deck, handheld PCs, tablets, laptops) ensuring that each device's specific resolution, aspect ratio, and Windows DPI scaling profile remain completely isolated.
 
-## About HDR
+---
 
-HDR starts supporting from Windows 11 23H2 and generally supported on 24H2. Some systems might not have HDR toggle on 23H2 and you just need to upgrade to 24H2. Any system lower than 23H2/Windows 10 will not have HDR option available.
+## 4. Quick Start & Installation
 
-> [!NOTE]
-> The below section is written for professional media workers. It doesn't stop you from enabling HDR if you know what you're doing and have deep understanding about how HDR works.
->
-> Apollo and SudoVDA can handle HDR just fine like any other streaming solutions.
->
-> If you have had good experience with HDR previously, you can safely ignore this section.
->
-> If you're curious, read on, but don't blame Apollo for poor HDR support.
+### Requirements
+* **Operating System:** Windows 10 (64-bit) or Windows 11 (64-bit).
+* **GPU:**
+  * AMD: Radeon RX 400 series or newer (VCE / AMF support).
+  * Nvidia: GeForce GTX 900 series or newer (NVENC support).
+  * Intel: Skylake HD Graphics 500 series or newer (QuickSync support).
 
-Whether HDR streaming looks good, it depends completely on your client.
+### Installation
+1. Download the latest installer (`Sunshine-VirtualDisplay-*.exe`) from the [Releases](https://github.com/fedehda/Sunshine_vda/releases) page.
+2. Run the installer with Administrator privileges to install the Sunshine service and the SudoVDA driver.
+3. Access the Web UI in your browser at `https://localhost:47990`.
+4. Configure your credentials on first launch.
+5. In Moonlight on your client device, select your PC and enter the pairing PIN in the Sunshine Web UI under the **PIN** tab.
 
-In short, ICC color correction should be totally useless while streaming HDR. It's your client's job to get HDR content displayed right, not the host. But in fact, it does affect the captured video stream and reflect changes on devices that can handle HDR correctly. On other devices that can't, the info is not respected at all.
+---
 
-It's very complicated to explain why HDR is a total mess, and why enabling HDR makes the image appear dark/yellow. If it's your first time got HDR streaming working, and thinks HDR looks awful, you're right, but that's not Apollo's fault, it's your device that tone mapped SDR content to the maximum of the capability of its screen, there's no headroom for anything beyond that actual peak brightness for HDR. For details, please take a look [here](https://github.com/ClassicOldSong/Apollo/issues/164).
+## 5. Network Configuration (WAN / Internet Streaming)
 
-For client devices, usually Apple products that have HDR capability can be trusted to have good results, other than that, your luck depends.
+If you plan to stream over the internet or cellular data, ensure the following ports are forwarded to your host PC:
 
-<details>
-<summary>DEPRECATION ALERT</summary>
+| Port | Protocol | Purpose |
+| :--- | :--- | :--- |
+| **47984** | TCP | HTTPS Control / App List / Launch |
+| **47989** | TCP | HTTP Server Discovery |
+| **48010** | TCP | RTSP Video Handshake |
+| **47998** | UDP | Video Streaming Data |
+| **47999** | UDP | Control / Ping Packets |
+| **48000** | UDP | Audio Streaming Data |
+| **48002** | UDP | Secondary Streaming Data |
+| **48010** | UDP | Voice / Microphone Stream |
 
-Enabling HDR is **generally not recommended** with **ANY streaming solutions** at this moment, probably in the long term. The issue with **HDR itself** is huge, with loads of semi-incompatible standards, and massive variance between device configurations and capabilities. Game support for HDR is still choppy.
+> [!TIP]
+> If streaming from mobile networks (4G/LTE/5G) through a router with IPv4 Port Forwarding or DMZ, ensure `address_family = ipv4` is set in `sunshine.conf` to prevent cellular clients from attempting unreachable IPv6 routes.
 
-SDR actually provides much more stable color accuracy, and are widely supported throughout most devices you can imagine. For games, art style can easily overcome the shortcoming with no HDR, and SDR has pretty standard workflows to ensure their visual performance. So HDR isn't *that* important in most of the cases.
+---
 
-</details>
+## 6. Credits & Acknowledgments
 
-## How to run multiple instances of Apollo for multiple virtual displays
+* **[LizardByte/Sunshine](https://github.com/LizardByte/Sunshine):** Upstream foundation, multi-platform streaming engine, and community maintenance.
+* **[ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo):** SudoVDA driver integration and display management architecture.
+* **[Moonlight Game Streaming](https://moonlight-stream.org/):** The client ecosystem that makes low-latency remote gaming possible.
 
-Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/How-to-start-multiple-instances-of-Apollo).
+---
 
-## FAQ
-Moved to [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/FAQ)
+## 7. License
 
-## Stuttering Clinic
-Here're some common causes and solutions for stutters: [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Stuttering-Clinic).
-
-## Device specific setups
-- Pixel devices might not be able to use native resolution:
-  - Change the device resolution to Max: https://github.com/ClassicOldSong/Apollo/issues/700
-
-## System Requirements
-
-> **Warning**: This table is a work in progress. Do not purchase hardware based on this.
-
-**Minimum Requirements**
-
-| **Component** | **Description** |
-|---------------|-----------------|
-| GPU           | AMD: VCE 1.0 or higher, see: [obs-amd hardware support](https://github.com/obsproject/obs-amd-encoder/wiki/Hardware-Support) |
-|               | Intel: VAAPI-compatible, see: [VAAPI hardware support](https://www.intel.com/content/www/us/en/developer/articles/technical/linuxmedia-vaapi.html) |
-|               | Nvidia: NVENC enabled cards, see: [nvenc support matrix](https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new) |
-| CPU           | AMD: Ryzen 3 or higher |
-|               | Intel: Core i3 or higher |
-| RAM           | 4GB or more |
-| OS            | Windows: 10+ (Windows Server requires [manual installation](https://github.com/nefarius/ViGEmBus/issues/153) for gamepad support) |
-|               | macOS: 12+ |
-|               | Linux/Debian: 11 (bullseye) |
-|               | Linux/Fedora: 39+ |
-|               | Linux/Ubuntu: 22.04+ (jammy) |
-| Network       | Host: 5GHz, 802.11ac |
-|               | Client: 5GHz, 802.11ac |
-
-**4k Suggestions**
-
-| **Component** | **Description** |
-|---------------|-----------------|
-| GPU           | AMD: Video Coding Engine 3.1 or higher |
-|               | Intel: HD Graphics 510 or higher |
-|               | Nvidia: GeForce GTX 1080 or higher |
-| CPU           | AMD: Ryzen 5 or higher |
-|               | Intel: Core i5 or higher |
-| Network       | Host: CAT5e ethernet or better |
-|               | Client: CAT5e ethernet or better |
-
-**HDR Suggestions**
-
-| **Component** | **Description** |
-|---------------|-----------------|
-| GPU           | AMD: Video Coding Engine 3.4 or higher |
-|               | Intel: UHD Graphics 730 or higher |
-|               | Nvidia: Pascal-based GPU (GTX 10-series) or higher |
-| CPU           | AMD: todo |
-|               | Intel: todo |
-| Network       | Host: CAT5e ethernet or better |
-|               | Client: CAT5e ethernet or better |
-
-## Integrations
-
-SudoVDA: Virtual Display Adapter Driver used in Apollo
-
-[Artemis](https://github.com/ClassicOldSong/moonlight-android): Integrated Virtual Display options control from client side
-
-**NOTE**: Artemis currently supports Android only. Other platforms will come later.
-
-## Support
-
-Currently support is only provided via GitHub Issues/Discussions.
-
-No real time chat support will ever be provided for Apollo and Artemis. Including but not limited to:
-
-- Discord
-- Telegram
-- Whatsapp
-- QQ
-- WeChat 
-
-> When there's a chat, there're dramas. -- Confucius
-
-## Downloads
-
-### Direct Download
-
-**Recommended**
-
-[Releases](https://github.com/ClassicOldSong/Apollo/releases)
-
-### WinGet
-
-**Note:** Community maintained
-
-In an elevated PowerShell window, run
-
-```pwsh
-winget install ClassicOldSong.Apollo
-
-```
-
-You'll need WinGet installed first.
-
-### Chocolatey
-
-**Note:** Community maintained
-
-You can also install the apollo streaming server with chocolatey.
-
-Install Chocolatey if you don't have it, then run the following command in an elevated PowerShell/CMD window:
-
-```pwsh
-choco upgrade apollo -y 
-```
-
-Same command can be used to upgrade, add to a scheduled task to automate updates.
-
-See more details on the chocolatey package [here](https://community.chocolatey.org/packages/apollo)
-
-## Disclaimer
-
-I got kicked from Moonlight and Sunshine's Discord server and banned from Sunshine's GitHub repo literally for helping people out.
-
-This is what I got for finding a bug, opened an issue, getting no response, troubleshoot myself, fixed the issue myself, shared it by PR to the main repo hoping my efforts can help someone else during the maintenance gap.
-
-Yes, I'm going away. [Apollo](https://github.com/ClassicOldSong/Apollo) and [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android) will no longer be compatible with OG Sunshine and OG Moonlight eventually, but they'll work even better with much more carefully designed features.
-
-The Moonlight repo had stayed silent for 5 months, with nobody actually responding to issues, and people are getting totally no help besides the limited FAQ in their Discord server. I tried to answer issues and questions, solve problems within my ability but I got kicked out just for helping others.
-
-**PRs for feature improvements are welcomed here unlike the main repo, your ideas are more likely to be appreciated and your efforts are actually being respected. We welcome people who can and willing to share their efforts, helping yourselves and other people in need.**
-
-**Update**: They have contacted me and apologized for this incident, but the fact it **happened** still motivated me to start my own fork.
-
-## License
-
-GPLv3
+Sunshine VDA is free and open-source software licensed under the **GNU General Public License v3.0 (GPLv3)**. See the [LICENSE](LICENSE) file for details.
