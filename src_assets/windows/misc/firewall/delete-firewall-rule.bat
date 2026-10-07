@@ -1,6 +1,5 @@
 @echo off
 
-set RULE_NAME=Apollo
-
-rem Delete the rule
-netsh advfirewall firewall delete rule name=%RULE_NAME%
+rem Delete the rules
+netsh advfirewall firewall delete rule name="Sunshine + VDA fork" >nul 2>&1
+netsh advfirewall firewall delete rule name=Apollo >nul 2>&1

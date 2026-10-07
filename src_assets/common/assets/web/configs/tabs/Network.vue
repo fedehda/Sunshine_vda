@@ -127,7 +127,7 @@ const effectivePort = computed(() => +config.value?.port ?? defaultMoonlightPort
     <div class="mb-3">
       <label for="bind_address" class="form-label">Bind Address</label>
       <input type="text" class="form-control" id="bind_address" placeholder="0.0.0.0" v-model="config.bind_address" />
-      <div class="form-text">IP address of the network interface Apollo should bind to (e.g. for Tailscale/VPN). Leave empty for all interfaces.</div>
+      <div class="form-text">IP address of the network interface Sunshine + VDA should bind to (e.g. for Tailscale/VPN). Leave empty for all interfaces.</div>
     </div>
 
     <!-- Packet Size (MTU) -->
