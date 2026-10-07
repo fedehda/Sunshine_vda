@@ -33,20 +33,19 @@ set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
         MessageBox MB_YESNO|MB_ICONQUESTION \
             'Do you want to remove Virtual Gamepad?' \
             /SD IDNO IDNO NoGamepad
-            nsExec::ExecToLog \
-              'powershell.exe -NoProfile -ExecutionPolicy Bypass -File \
-                \\\"$INSTDIR\\\\scripts\\\\uninstall-gamepad.ps1\\\"'; \
-              skipped if no
+        nsExec::ExecToLog \
+            'powershell.exe -NoProfile -ExecutionPolicy Bypass -File \
+            \\\"$INSTDIR\\\\scripts\\\\uninstall-gamepad.ps1\\\"'
         NoGamepad:
         MessageBox MB_YESNO|MB_ICONQUESTION \
             'Do you want to remove SudoVDA Virtual Display Driver?' \
             /SD IDNO IDNO NoSudoVDA
-            nsExec::ExecToLog '\\\"$INSTDIR\\\\drivers\\\\sudovda\\\\uninstall.bat\\\"'; skipped if no
+        nsExec::ExecToLog '\\\"$INSTDIR\\\\drivers\\\\sudovda\\\\uninstall.bat\\\"'
         NoSudoVDA:
         MessageBox MB_YESNO|MB_ICONQUESTION \
             'Do you want to remove $INSTDIR (this includes the configuration, cover images, and settings)?' \
             /SD IDNO IDNO NoDelete
-            RMDir /r \\\"$INSTDIR\\\"; skipped if no
+        RMDir /r \\\"$INSTDIR\\\"
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\update-path.bat\\\" remove'
         NoDelete:
         ")

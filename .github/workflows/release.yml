@@ -121,6 +121,7 @@ jobs:
           cmake --version
           ninja --version
           npm --version
+          makensis -VERSION || true
 
       - name: Configure
         shell: msys2 {0}
@@ -141,7 +142,21 @@ jobs:
       - name: Package installer
         shell: msys2 {0}
         run: |
-          cpack -G NSIS --config ./build/CPackConfig.cmake
+          # Workaround for MSYS2 mingw-w64-*-nsis 3.13-1 plugins directory bug (issue #32208)
+          if [ -d /ucrt64/share/nsis/Plugins ]; then
+            mkdir -p /ucrt64/share/nsis/Plugins/x86-unicode /ucrt64/share/nsis/Plugins/amd64-unicode
+            if [ -d /ucrt64/share/nsis/Plugins/unicode ]; then
+              cp -rn /ucrt64/share/nsis/Plugins/unicode/* /ucrt64/share/nsis/Plugins/x86-unicode/ 2>/dev/null || true
+              cp -rn /ucrt64/share/nsis/Plugins/unicode/* /ucrt64/share/nsis/Plugins/amd64-unicode/ 2>/dev/null || true
+            fi
+            find /ucrt64/share/nsis/Plugins -maxdepth 1 -name "*.dll" -exec cp -n {} /ucrt64/share/nsis/Plugins/x86-unicode/ \; 2>/dev/null || true
+            find /ucrt64/share/nsis/Plugins -maxdepth 1 -name "*.dll" -exec cp -n {} /ucrt64/share/nsis/Plugins/amd64-unicode/ \; 2>/dev/null || true
+          fi
+          cpack -G NSIS --config ./build/CPackConfig.cmake || {
+            echo "=== CPack failed! Dumping NSISOutput.log ==="
+            find build -name "NSISOutput.log" -exec cat {} +
+            exit 1
+          }
 
       - name: Collect installer
         id: collect
