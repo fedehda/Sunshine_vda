@@ -651,7 +651,7 @@ namespace proc {
       return;
     }
 
-    if (_app.terminate_on_pause) {
+    if (_app.terminate_on_pause || this->virtual_display) {
       BOOST_LOG(info) << "Terminating app [" << _app_name << "] when all clients are disconnected. Pause commands are skipped.";
       terminate();
       return;
@@ -1359,7 +1359,7 @@ namespace proc {
           ctx.use_app_identity = app_node.value("use-app-identity", false);
           ctx.per_client_app_identity = app_node.value("per-client-app-identity", false);
           ctx.allow_client_commands = app_node.value("allow-client-commands", true);
-          ctx.terminate_on_pause = app_node.value("terminate-on-pause", false);
+          ctx.terminate_on_pause = app_node.value("terminate-on-pause", true);
           ctx.gamepad = app_node.value("gamepad", "");
 
           // Calculate a unique application id.
@@ -1426,7 +1426,7 @@ namespace proc {
       ctx.use_app_identity = false;
       ctx.per_client_app_identity = false;
       ctx.allow_client_commands = false;
-      ctx.terminate_on_pause = false;
+      ctx.terminate_on_pause = true;
 
       ctx.elevated = false;
       ctx.auto_detach = true;
@@ -1460,7 +1460,7 @@ namespace proc {
       ctx.use_app_identity = false;
       ctx.per_client_app_identity = false;
       ctx.allow_client_commands = false;
-      ctx.terminate_on_pause = false;
+      ctx.terminate_on_pause = true;
 
       ctx.elevated = false;
       ctx.auto_detach = true;
@@ -1531,7 +1531,7 @@ namespace proc {
         ctx.use_app_identity = false;
         ctx.per_client_app_identity = false;
         ctx.allow_client_commands = false;
-        ctx.terminate_on_pause = false;
+        ctx.terminate_on_pause = true;
 
         ctx.elevated = false;
         ctx.auto_detach = true;
