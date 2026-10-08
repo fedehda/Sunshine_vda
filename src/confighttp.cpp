@@ -12,7 +12,9 @@
 #include <fstream>
 #include <set>
 #include <sstream>
+#include <string_view>
 #include <thread>
+#include <vector>
 #include <numeric>
 #include <algorithm>
 
@@ -133,21 +135,71 @@ namespace confighttp {
   }
 
   /**
-   * @brief Retrieve the value of a key from a cookie string.
+   * @brief Retrieve all values for a specific cookie key from a cookie header string.
+   * Properly parses RFC 6265 cookie pairs, matching exact cookie names (not substrings),
+   * and trims whitespace or surrounding quotes.
+   * @param cookieString The cookie header string.
+   * @param key The exact cookie name to search for.
+   * @return Vector of matched cookie values.
+   */
+  std::vector<std::string> getCookieValues(const std::string& cookieString, const std::string& key) {
+    std::vector<std::string> values;
+    std::size_t pos = 0;
+    while (pos < cookieString.size()) {
+      // Skip leading separators and whitespace
+      while (pos < cookieString.size() && (cookieString[pos] == ' ' || cookieString[pos] == '\t' || cookieString[pos] == ';')) {
+        ++pos;
+      }
+      if (pos >= cookieString.size()) {
+        break;
+      }
+
+      auto endPos = cookieString.find(';', pos);
+      if (endPos == std::string::npos) {
+        endPos = cookieString.size();
+      }
+
+      std::string_view pair(cookieString.data() + pos, endPos - pos);
+      auto eqPos = pair.find('=');
+      if (eqPos != std::string_view::npos) {
+        auto name = pair.substr(0, eqPos);
+        while (!name.empty() && (name.front() == ' ' || name.front() == '\t')) {
+          name.remove_prefix(1);
+        }
+        while (!name.empty() && (name.back() == ' ' || name.back() == '\t')) {
+          name.remove_suffix(1);
+        }
+
+        if (name == key) {
+          auto val = pair.substr(eqPos + 1);
+          while (!val.empty() && (val.front() == ' ' || val.front() == '\t')) {
+            val.remove_prefix(1);
+          }
+          while (!val.empty() && (val.back() == ' ' || val.back() == '\t')) {
+            val.remove_suffix(1);
+          }
+          // Strip optional surrounding quotes as per RFC 6265
+          if (val.size() >= 2 && val.front() == '"' && val.back() == '"') {
+            val.remove_prefix(1);
+            val.remove_suffix(1);
+          }
+          values.emplace_back(std::string(val));
+        }
+      }
+      pos = endPos + 1;
+    }
+    return values;
+  }
+
+  /**
+   * @brief Retrieve the first value of a key from a cookie string.
    * @param cookieString The cookie header string.
    * @param key The key to search.
    * @return The value if found, empty string otherwise.
    */
   std::string getCookieValue(const std::string& cookieString, const std::string& key) {
-    std::string keyWithEqual = key + "=";
-    std::size_t startPos = cookieString.find(keyWithEqual);
-    if (startPos == std::string::npos)
-      return "";
-    startPos += keyWithEqual.length();
-    std::size_t endPos = cookieString.find(";", startPos);
-    if (endPos == std::string::npos)
-      return cookieString.substr(startPos);
-    return cookieString.substr(startPos, endPos - startPos);
+    auto values = getCookieValues(cookieString, key);
+    return values.empty() ? "" : values.front();
   }
 
   /**
@@ -204,10 +256,21 @@ namespace confighttp {
     auto cookies = request->header.find("cookie");
     if (cookies == request->header.end())
       return false;
-    auto authCookie = getCookieValue(cookies->second, "auth");
-    if (authCookie.empty() ||
-        util::hex(crypto::hash(authCookie + config::sunshine.salt)).to_string() != sessionCookie)
+    auto authCookies = getCookieValues(cookies->second, "auth");
+    if (authCookies.empty())
       return false;
+
+    bool matched = false;
+    for (const auto &authCookie : authCookies) {
+      if (!authCookie.empty() &&
+          util::hex(crypto::hash(authCookie + config::sunshine.salt)).to_string() == sessionCookie) {
+        matched = true;
+        break;
+      }
+    }
+    if (!matched)
+      return false;
+
     fg.disable();
     return true;
   }
@@ -1488,7 +1551,7 @@ namespace confighttp {
       sessionCookie = util::hex(crypto::hash(sessionCookieRaw + config::sunshine.salt)).to_string();
       cookie_creation_time = std::chrono::steady_clock::now();
       const SimpleWeb::CaseInsensitiveMultimap headers {
-        { "Set-Cookie", "auth=" + sessionCookieRaw + "; Secure; SameSite=Strict; Max-Age=2592000; Path=/" }
+        { "Set-Cookie", "auth=" + sessionCookieRaw + "; Secure; SameSite=Lax; Max-Age=2592000; Path=/" }
       };
       response->write(headers);
       fg.disable();
