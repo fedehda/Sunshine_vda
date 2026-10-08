@@ -92,6 +92,15 @@ jobs:
         with:
           node-version: "lts/*"
 
+      - name: Set up NSIS
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\NSIS\makensis.exe")) {
+            choco install nsis -y
+          }
+          "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /VERSION
+
       - name: Set up MSYS2
         uses: msys2/setup-msys2@v2
         with:
@@ -107,7 +116,6 @@ jobs:
             mingw-w64-ucrt-x86_64-MinHook
             mingw-w64-ucrt-x86_64-miniupnpc
             mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-nsis
             mingw-w64-ucrt-x86_64-onevpl
             mingw-w64-ucrt-x86_64-openssl
             mingw-w64-ucrt-x86_64-opus
@@ -121,7 +129,7 @@ jobs:
           cmake --version
           ninja --version
           npm --version
-          makensis -VERSION || true
+          makensis /VERSION
 
       - name: Configure
         shell: msys2 {0}
@@ -132,7 +140,7 @@ jobs:
           COMMIT: ${{ github.sha }}
           TAG: ${{ steps.metadata.outputs.release_tag }}
         run: |
-          cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+          cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCPACK_NSIS_EXECUTABLE="C:/Program Files (x86)/NSIS/makensis.exe"
 
       - name: Build
         shell: msys2 {0}
@@ -142,16 +150,6 @@ jobs:
       - name: Package installer
         shell: msys2 {0}
         run: |
-          # Workaround for MSYS2 mingw-w64-*-nsis 3.13-1 plugins directory bug (issue #32208)
-          if [ -d /ucrt64/share/nsis/Plugins ]; then
-            mkdir -p /ucrt64/share/nsis/Plugins/x86-unicode /ucrt64/share/nsis/Plugins/amd64-unicode
-            if [ -d /ucrt64/share/nsis/Plugins/unicode ]; then
-              cp -rn /ucrt64/share/nsis/Plugins/unicode/* /ucrt64/share/nsis/Plugins/x86-unicode/ 2>/dev/null || true
-              cp -rn /ucrt64/share/nsis/Plugins/unicode/* /ucrt64/share/nsis/Plugins/amd64-unicode/ 2>/dev/null || true
-            fi
-            find /ucrt64/share/nsis/Plugins -maxdepth 1 -name "*.dll" -exec cp -n {} /ucrt64/share/nsis/Plugins/x86-unicode/ \; 2>/dev/null || true
-            find /ucrt64/share/nsis/Plugins -maxdepth 1 -name "*.dll" -exec cp -n {} /ucrt64/share/nsis/Plugins/amd64-unicode/ \; 2>/dev/null || true
-          fi
           cpack -G NSIS --config ./build/CPackConfig.cmake || {
             echo "=== CPack failed! Dumping NSISOutput.log ==="
             find build -name "NSISOutput.log" -exec cat {} +
