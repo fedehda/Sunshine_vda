@@ -129,7 +129,6 @@ jobs:
           cmake --version
           ninja --version
           npm --version
-          makensis /VERSION
 
       - name: Configure
         shell: msys2 {0}
