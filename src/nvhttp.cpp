@@ -40,6 +40,7 @@
 #include "zwpad.h"
 
 #ifdef _WIN32
+  #include "platform/windows/misc.h"
   #include "platform/windows/virtual_display.h"
 #endif
 
