@@ -297,11 +297,8 @@ namespace proc {
           launch_session->display_guid
         );
 
-        // No matter we get the display name or not, the virtual display might still be created.
-        // We need to track it properly to remove the display when the session terminates.
-        launch_session->virtual_display = true;
-
         if (!vdisplayName.empty()) {
+          launch_session->virtual_display = true;
           BOOST_LOG(info) << "Virtual Display created at " << vdisplayName;
 
           // Don't change display settings when no params are given
@@ -326,7 +323,9 @@ namespace proc {
 
           config::video.output_name = display_device::map_display_name(this->display_name);
         } else {
-          BOOST_LOG(warning) << "Virtual Display creation failed, or cannot get created display name in time!";
+          BOOST_LOG(warning) << "Virtual Display creation failed, or cannot get created display name in time! Cleaning up orphan GUID and falling back to physical display.";
+          VDISPLAY::removeVirtualDisplay(launch_session->display_guid);
+          launch_session->virtual_display = false;
         }
       } else {
         // Driver isn't working so we don't need to track virtual display.
@@ -770,7 +769,7 @@ namespace proc {
     // Only show the Stopped notification if we actually have an app to stop
     // Since terminate() is always run when a new app has started
     if (proc::proc.get_last_run_app_name().length() > 0 && has_run) {
-      if (used_virtual_display) {
+      if (this->virtual_display) {
         display_device::reset_persistence();
       } else {
         display_device::revert_configuration();

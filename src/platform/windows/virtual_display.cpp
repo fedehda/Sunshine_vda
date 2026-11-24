@@ -1,4 +1,6 @@
 #include <windows.h>
+#include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <vector>
 #include <setupapi.h>
@@ -672,14 +674,16 @@ std::wstring createVirtualDisplay(
 	}
 
 	uint32_t retryInterval = 20;
+	constexpr auto maxWait = std::chrono::milliseconds(5000);
+	const auto startTime = std::chrono::steady_clock::now();
 	wchar_t deviceName[CCHDEVICENAME]{};
 	while (!GetAddedDisplayName(output, deviceName)) {
-		Sleep(retryInterval);
-		if (retryInterval > 320) {
-			printf("[SUDOVDA] Cannot get name for newly added virtual display!\n");
+		if (std::chrono::steady_clock::now() - startTime >= maxWait) {
+			printf("[SUDOVDA] Cannot get name for newly added virtual display after 5000ms!\n");
 			return std::wstring();
 		}
-		retryInterval *= 2;
+		Sleep(retryInterval);
+		retryInterval = (std::min)<uint32_t>(retryInterval * 2, 200);
 	}
 
 	wprintf(L"[SUDOVDA] Virtual display added successfully: %ls\n", deviceName);

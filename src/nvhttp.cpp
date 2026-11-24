@@ -1296,6 +1296,21 @@ namespace nvhttp {
             return;
           }
         }
+#ifdef _WIN32
+        else if (no_active_sessions && proc::proc.virtual_display && !proc::proc.display_name.empty()) {
+          if (launch_session->width && launch_session->height && launch_session->fps) {
+            int target_fps = launch_session->fps;
+            if (target_fps < 1000) {
+              target_fps *= 1000;
+            }
+            if (config::video.double_refreshrate) {
+              target_fps *= 2;
+            }
+            auto vdisplay_w = platf::from_utf8(proc::proc.display_name);
+            VDISPLAY::changeDisplaySettings(vdisplay_w.c_str(), launch_session->width, launch_session->height, target_fps);
+          }
+        }
+#endif
       } else {
         const auto& apps = proc::proc.get_apps();
         auto app_iter = std::find_if(apps.begin(), apps.end(), [&appid_str, &appuuid_str](const auto _app) {
@@ -1429,6 +1444,21 @@ namespace nvhttp {
         return;
       }
     }
+#ifdef _WIN32
+    else if (no_active_sessions && proc::proc.virtual_display && !proc::proc.display_name.empty()) {
+      if (launch_session->width && launch_session->height && launch_session->fps) {
+        int target_fps = launch_session->fps;
+        if (target_fps < 1000) {
+          target_fps *= 1000;
+        }
+        if (config::video.double_refreshrate) {
+          target_fps *= 2;
+        }
+        auto vdisplay_w = platf::from_utf8(proc::proc.display_name);
+        VDISPLAY::changeDisplaySettings(vdisplay_w.c_str(), launch_session->width, launch_session->height, target_fps);
+      }
+    }
+#endif
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {
