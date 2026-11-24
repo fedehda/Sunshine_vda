@@ -1,5 +1,4 @@
 #include <windows.h>
-#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <vector>
@@ -683,7 +682,7 @@ std::wstring createVirtualDisplay(
 			return std::wstring();
 		}
 		Sleep(retryInterval);
-		retryInterval = (std::min)<uint32_t>(retryInterval * 2, 200);
+		retryInterval = (retryInterval * 2 < 200) ? (retryInterval * 2) : 200;
 	}
 
 	wprintf(L"[SUDOVDA] Virtual display added successfully: %ls\n", deviceName);
